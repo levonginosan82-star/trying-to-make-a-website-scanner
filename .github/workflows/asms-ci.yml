@@ -1,0 +1,73 @@
+name: ASMS CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  worker:
+    name: worker (lint + tests)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: asms/worker
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: asms/worker/pyproject.toml
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .[dev]
+      - name: Lint
+        run: ruff check .
+      - name: Test
+        run: pytest -q
+
+  api:
+    name: api (lint + tests)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: asms/api
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: asms/api/pyproject.toml
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .[dev]
+      - name: Lint
+        run: ruff check .
+      - name: Test
+        run: pytest -q
+
+  secrets-self-scan:
+    name: secrets self-scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install worker
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ./asms/worker
+      # Don't fail the build on findings — this is the bootstrap run that
+      # establishes a baseline. Promote to `if: failure()` once the codebase
+      # is clean.
+      - name: Scan repo for hardcoded secrets
+        continue-on-error: true
+        run: asms-worker scan-secrets --path .
