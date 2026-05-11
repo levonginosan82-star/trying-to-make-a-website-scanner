@@ -3,7 +3,12 @@
 from __future__ import annotations
 
 from asms_worker.checks.base import Check
+from asms_worker.checks.dns_records import DNSCheck
 from asms_worker.checks.headers import SecurityHeadersCheck
+from asms_worker.checks.secrets import SecretsCheck
+from asms_worker.checks.sensitive_paths import SensitivePathsCheck
+from asms_worker.checks.tech_disclosure import TechDisclosureCheck
+from asms_worker.checks.tls import TLSCheck
 
 
 class _Registry:
@@ -27,3 +32,8 @@ class _Registry:
 
 REGISTRY = _Registry()
 REGISTRY.register(SecurityHeadersCheck())
+REGISTRY.register(TLSCheck())
+REGISTRY.register(SensitivePathsCheck())
+REGISTRY.register(TechDisclosureCheck())
+REGISTRY.register(DNSCheck())
+REGISTRY.register(SecretsCheck())

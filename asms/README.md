@@ -14,9 +14,9 @@ platform; the legacy scanner can be wrapped as a worker module during migration.
 | --- | --- |
 | `docs/ARCHITECTURE.md` | System architecture, microservices, queues, scanners, security model |
 | `db/schema.sql` | PostgreSQL schema (organizations, users, assets, scans, vulnerabilities, findings, …) |
-| `worker/` | Python scanner worker. Pluggable check registry; ships a DAST security-headers check. |
+| `worker/` | Python scanner worker. Pluggable check registry: `dast.headers`, `dast.tls`, `dast.sensitive_paths`, `dast.tech_disclosure`, `easm.dns`, `sast.secrets`. |
 | `dashboard/index.html` | Static control panel (Tailwind CDN) with Security Score, severity breakdown, latest critical threats, filterable findings table |
-| `api/` | (Scaffolded) FastAPI gateway stub for the control plane |
+| `api/` | FastAPI control plane: `/scans`, `/vulnerabilities`, `/security-score`. SQLAlchemy + Pydantic v2, async SQLite by default. |
 
 ## Quick start
 
@@ -57,30 +57,55 @@ python -m http.server --directory asms/dashboard 8080
 ```
 
 The dashboard ships with mock data in `dashboard/data/sample.json` so it renders
-without a backend; swap the fetch URL in `index.html` to point at the FastAPI
-gateway once it is deployed.
+without a backend. To point it at a running API, open the dashboard with a
+`?api=` query string:
+
+```
+http://localhost:8080/?api=http://localhost:8000&org=acme
+```
+
+It will fetch live data from the API and fall back to the mock JSON if the API
+is unreachable.
+
+### 4. API (FastAPI control plane)
+
+```bash
+cd asms/api
+python -m venv .venv && source .venv/bin/activate
+pip install -e .[dev]
+
+# Seed the SQLite dev DB with the same data the dashboard ships with
+python -m asms_api.seed
+
+uvicorn asms_api.main:app --reload --port 8000
+# -> http://localhost:8000/docs
+```
 
 ## Scope of this PR
 
-Production-ready in this PR:
+Production-ready:
 - Architecture documentation and threat model.
 - PostgreSQL schema with all required fields (`id`, `type`, `severity`, `cvss`,
   `description`, `url/parameter`, `status`).
-- Python worker that consumes a task, performs an HTTP request, and parses
-  security headers (CSP, HSTS, X-Frame-Options, X-Content-Type-Options,
-  Referrer-Policy, Permissions-Policy, cookie flags) into findings, with unit
-  tests.
-- Tailwind dashboard with Security Score, severity breakdown, and latest
-  critical threats.
+- FastAPI control plane (`/scans`, `/vulnerabilities`, `/security-score`) with
+  SQLAlchemy ORM, Pydantic v2, async SQLite for local dev / Postgres for prod.
+- Python worker with six pluggable checks, all under unit-test coverage:
+  - `dast.headers` — security-header analyser.
+  - `dast.tls` — certificate expiry, hostname mismatch, deprecated protocols.
+  - `dast.sensitive_paths` — high-signal probes (`.git/HEAD`, `.env`, etc.).
+  - `dast.tech_disclosure` — version fingerprinting on response headers.
+  - `easm.dns` — SPF/DKIM/DMARC/CAA posture.
+  - `sast.secrets` — regex-based secret detection for source trees and CI.
+- Tailwind dashboard with Security Score, severity breakdown, latest critical
+  threats, and live API wiring via `?api=` query param.
+- GitHub Actions CI: ruff + pytest on every push and PR.
 
-Scaffolded / specified-but-not-implemented in this PR (see
-`docs/ARCHITECTURE.md` for design):
+Scaffolded / specified-but-not-implemented (see `docs/ARCHITECTURE.md`):
 - Full DAST crawler (SPA-aware), CSRF/CAPTCHA bypass.
-- EASM (subdomain bruteforce, WHOIS, DNS, Nmap, cert transparency monitoring).
 - ML-based false-positive reduction and dark-web leak monitoring.
 - API scanning (OAS/GraphQL/gRPC).
-- SAST and IaC scanners; CI/CD plugins.
-- FastAPI control plane and React SPA.
+- IaC scanner; broader CI/CD plug-ins.
+- React SPA frontend.
 
 Each scanner module follows the same `Check` interface (see
 `worker/asms_worker/checks/base.py`) so new families can be added without

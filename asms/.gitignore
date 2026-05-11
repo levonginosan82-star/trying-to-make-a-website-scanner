@@ -17,3 +17,9 @@ htmlcov/
 # OS
 .DS_Store
 Thumbs.db
+
+# Local API dev artifacts
+*.db
+*.db-journal
+asms.db*
+asms-test.db*
