@@ -216,13 +216,78 @@ function applyFilters() {
   renderTable(filtered);
 }
 
-async function load() {
+/**
+ * Try to load live data from the ASMS API; fall back to the bundled sample.json
+ * so the static dashboard keeps working even when the API isn't running.
+ */
+const PARAMS = new URLSearchParams(window.location.search);
+const API_BASE = PARAMS.get("api") || window.ASMS_API_BASE || "";
+const ORG_SLUG = PARAMS.get("org") || window.ASMS_ORG || "acme";
+
+async function fetchLive() {
+  if (!API_BASE) return null;
+  try {
+    const [scoreRes, vulnRes] = await Promise.all([
+      fetch(`${API_BASE}/api/v1/organizations/${ORG_SLUG}/security-score`),
+      fetch(`${API_BASE}/api/v1/organizations/${ORG_SLUG}/vulnerabilities?limit=500`),
+    ]);
+    if (!scoreRes.ok || !vulnRes.ok) return null;
+    const score = await scoreRes.json();
+    const vulns = await vulnRes.json();
+    return {
+      source: "live",
+      organization: { name: "ASMS", assets_total: "—", scans_today: "—" },
+      security_score: score.security_score,
+      severity_breakdown: {
+        critical: score.open_critical,
+        high: score.open_high,
+        medium: score.open_medium,
+        low: score.open_low,
+        info: score.open_info,
+      },
+      vulnerabilities: vulns.map((v) => ({
+        id: v.id,
+        type: v.type,
+        title: v.title,
+        severity: v.severity,
+        cvss: v.cvss,
+        url: v.url,
+        parameter: v.parameter,
+        status: v.status,
+        asset: v.asset_id,
+        discovered: v.first_seen_at,
+      })),
+      // The compliance + trend datasets aren't yet wired through the API;
+      // borrow them from the mock JSON so the rest of the dashboard renders.
+      _need_mock_supplements: true,
+    };
+  } catch (err) {
+    console.warn("ASMS API unreachable, falling back to mock data:", err);
+    return null;
+  }
+}
+
+async function fetchMock() {
   const res = await fetch("data/sample.json");
   if (!res.ok) throw new Error(`Failed to load data: ${res.status}`);
   const data = await res.json();
+  data.source = "mock";
+  return data;
+}
 
-  $("org-name").textContent = data.organization.name + " — Security Command Center";
-  $("org-meta").textContent = `${data.organization.assets_total} assets monitored · ${data.organization.scans_today} scans today`;
+async function load() {
+  const mock = await fetchMock();
+  const live = await fetchLive();
+  const data = live ? { ...live } : mock;
+  if (live && live._need_mock_supplements) {
+    data.compliance = mock.compliance;
+    data.trend = mock.trend;
+  }
+
+  $("org-name").textContent = (data.organization?.name ?? "ASMS") + " — Security Command Center";
+  $("org-meta").textContent =
+    `${data.organization?.assets_total ?? "—"} assets monitored · ${data.organization?.scans_today ?? "—"} scans today` +
+    (data.source === "live" ? " · live data" : "");
   $("last-refresh").textContent = new Date().toLocaleTimeString();
 
   renderScore(data.security_score);

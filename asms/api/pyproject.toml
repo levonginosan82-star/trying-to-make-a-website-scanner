@@ -3,39 +3,34 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "asms-worker"
+name = "asms-api"
 version = "0.1.0"
-description = "ASMS scanner worker: pluggable Check registry with a security-headers DAST check."
+description = "ASMS control-plane FastAPI service: scans, vulnerabilities, security score."
 readme = "README.md"
 requires-python = ">=3.10"
 authors = [{ name = "ASMS" }]
 license = { text = "MIT" }
 dependencies = [
-    "httpx>=0.27",
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.27",
     "pydantic>=2.6",
-    "celery>=5.3",
-    "click>=8.1",
+    "sqlalchemy>=2.0",
+    "aiosqlite>=0.20",
+    "greenlet>=3.0",
+    "python-multipart>=0.0.9",
 ]
 
 [project.optional-dependencies]
-easm = [
-    "dnspython>=2.6",
-]
 dev = [
     "pytest>=8.0",
     "pytest-asyncio>=0.23",
-    "respx>=0.21",
+    "httpx>=0.27",
     "ruff>=0.4",
-    "mypy>=1.10",
-    "dnspython>=2.6",
 ]
-
-[project.scripts]
-asms-worker = "asms_worker.cli:cli"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["asms_worker*"]
+include = ["asms_api*"]
 
 [tool.ruff]
 line-length = 100

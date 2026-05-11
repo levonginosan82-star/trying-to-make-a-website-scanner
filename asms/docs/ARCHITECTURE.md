@@ -65,7 +65,13 @@ with a single platform offering:
 
 ## 3. Services
 
-### 3.1 API Gateway  **[scaffolded]**
+### 3.1 API Gateway  **[partially implemented]**
+
+A FastAPI control-plane service lives in `asms/api/`. It currently exposes
+`/health`, `/api/v1/organizations/{org}/security-score`,
+`/api/v1/organizations/{org}/vulnerabilities`, `POST /api/v1/scans`, and
+`GET /api/v1/scans/{scan_id}`. SQLAlchemy 2.0 + async SQLite for local dev;
+Postgres in production. Auth, MFA, and rate limiting are still scaffolded.
 - FastAPI behind nginx/envoy.
 - OAuth2 (authorization-code + PKCE) with MFA (TOTP, WebAuthn).
 - RBAC: `Org Admin`, `Security Lead`, `Engineer`, `Auditor`, `API Client`.
@@ -95,19 +101,23 @@ Worker families (all consume the same job envelope; see §5):
 
 | Family | Status | Notes |
 | --- | --- | --- |
-| `dast.headers` | **implemented** | This PR — security-header analysis |
+| `dast.headers` | **implemented** | Security-header analysis (HSTS, CSP, XFO, cookies, etc.) |
+| `dast.tls` | **implemented** | TLS certificate expiry, hostname mismatch, deprecated protocols, self-signed |
+| `dast.sensitive_paths` | **implemented** | High-signal probes for `.git/HEAD`, `.env`, phpinfo, actuator, server-status, … |
+| `dast.tech_disclosure` | **implemented** | Version fingerprinting on response headers (Apache/nginx/IIS/PHP/ASP.NET/Tomcat) |
 | `dast.crawler` | [scaffolded] | Playwright-based SPA crawl, CSRF token learner, CAPTCHA bypass (auth cookies / API token plug-in) |
 | `dast.injection` | [scaffolded] | SQLi, XSS, SSRF, RCE, LFI/RFI via payload templates + reflected-response and out-of-band oracles |
 | `dast.business_logic` | [scaffolded] | Replay-and-mutate auth flows; rate-limit/IDOR detection |
+| `easm.dns` | **implemented** | SPF/DKIM/DMARC/CAA posture via `dnspython` |
 | `easm.subdomains` | [scaffolded] | wordlist + cert-transparency + passive DNS |
-| `easm.dns` | [scaffolded] | SPF/DKIM/DMARC, NS, MX, CAA |
 | `easm.ports` | [scaffolded] | masscan + nmap service detection |
 | `easm.cert` | [scaffolded] | crt.sh + Censys monitoring for leaked SSL |
 | `api.scanner` | [scaffolded] | OpenAPI/Swagger, GraphQL introspection, gRPC reflection fuzzers |
 | `mobile.masvs` | [scaffolded] | OWASP MASVS checks against mobile backends |
 | `infra.host` | [scaffolded] | Authenticated host scan, package CVE matching |
 | `compliance` | [scaffolded] | PCI/ISO/GDPR/HIPAA/CIS rule packs derived from findings |
-| `sast.scanner` | [scaffolded] | Semgrep + trufflehog (secrets) on a repo URL |
+| `sast.secrets` | **implemented** | Regex-based secret detector (AWS, GitHub, Slack, JWT, private keys, generic) |
+| `sast.scanner` | [scaffolded] | Semgrep on a repo URL |
 | `iac.scanner` | [scaffolded] | Checkov / kube-bench / tfsec on Docker/K8s/Terraform |
 | `darkweb.monitor` | [scaffolded] | HIBP-style + private feed integrations |
 | `ml.classify` | [scaffolded] | gradient-boosted classifier that downgrades likely false positives based on response, payload, and historical labels |
@@ -181,7 +191,13 @@ retry counter capped by orchestrator policy.
 - CI/CD: GitHub Actions / GitLab CI build per-service images, sign with cosign,
   push to registry; ArgoCD syncs to staging then production.
 
-## 8. CI/CD integration  **[scaffolded]**
+## 8. CI/CD integration  **[partially implemented]**
+
+This repo runs its own CI via `.github/workflows/asms-ci.yml`: ruff + pytest on
+the worker and API on every push and PR. The `sast.secrets` check ships with a
+`scan-secrets` CLI command that exits non-zero on critical/high findings —
+plug it into any CI runner to gate pull requests on accidental credential
+commits.
 
 Per-pipeline plugin (`asms-cli`) invokes a SAST scan and/or a DAST scan against
 a preview deployment, posts a SARIF artefact, and fails the build on findings
