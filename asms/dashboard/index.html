@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="en" class="h-full bg-slate-950 text-slate-100">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ASMS — Security Command Center</title>
+  <script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <style>
+    :root {
+      color-scheme: dark;
+    }
+    body { font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+    .glow-critical { box-shadow: 0 0 0 1px rgba(239,68,68,0.4), 0 10px 30px -10px rgba(239,68,68,0.35); }
+    .scrollbar-thin::-webkit-scrollbar { width: 8px; height: 8px; }
+    .scrollbar-thin::-webkit-scrollbar-thumb { background: rgba(148,163,184,0.3); border-radius: 4px; }
+  </style>
+</head>
+<body class="h-full">
+  <div class="min-h-full">
+    <!-- Top bar -->
+    <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur">
+      <div class="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
+        <div class="flex items-center gap-3">
+          <div class="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-emerald-400 to-cyan-500 text-slate-950 font-black">A</div>
+          <div>
+            <div class="text-sm font-semibold tracking-wide text-slate-100">ASMS</div>
+            <div class="text-xs text-slate-400">Automated Security Management System</div>
+          </div>
+        </div>
+        <nav class="hidden md:flex items-center gap-6 text-sm text-slate-300">
+          <a class="text-emerald-400" href="#">Dashboard</a>
+          <a class="hover:text-slate-100" href="#">Assets</a>
+          <a class="hover:text-slate-100" href="#">Scans</a>
+          <a class="hover:text-slate-100" href="#">Vulnerabilities</a>
+          <a class="hover:text-slate-100" href="#">Compliance</a>
+          <a class="hover:text-slate-100" href="#">Reports</a>
+        </nav>
+        <div class="flex items-center gap-3">
+          <button class="rounded-md bg-emerald-500 px-3 py-1.5 text-sm font-medium text-slate-950 hover:bg-emerald-400">
+            New scan
+          </button>
+          <div class="h-8 w-8 rounded-full bg-slate-700 flex items-center justify-center text-xs">SE</div>
+        </div>
+      </div>
+    </header>
+
+    <main class="mx-auto max-w-7xl px-6 py-8 space-y-8">
+      <!-- Greeting + meta -->
+      <section class="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h1 class="text-2xl font-semibold" id="org-name">Loading…</h1>
+          <p class="text-sm text-slate-400" id="org-meta"></p>
+        </div>
+        <div class="flex items-center gap-2 text-xs text-slate-400">
+          <span class="h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></span>
+          <span>Live — last refresh <span id="last-refresh">just now</span></span>
+        </div>
+      </section>
+
+      <!-- KPI strip -->
+      <section class="grid grid-cols-1 gap-4 md:grid-cols-4">
+        <!-- Security score -->
+        <div class="md:col-span-2 rounded-xl border border-slate-800 bg-slate-900 p-6">
+          <div class="flex items-center justify-between">
+            <h2 class="text-sm font-medium uppercase tracking-wider text-slate-400">Security score</h2>
+            <span id="score-band" class="rounded-full px-2 py-0.5 text-xs font-medium">—</span>
+          </div>
+          <div class="mt-4 flex items-end gap-6">
+            <div class="relative h-32 w-32">
+              <svg viewBox="0 0 120 120" class="h-full w-full -rotate-90">
+                <circle cx="60" cy="60" r="52" stroke="rgb(30 41 59)" stroke-width="14" fill="none" />
+                <circle id="score-arc" cx="60" cy="60" r="52" stroke="rgb(16 185 129)" stroke-width="14" fill="none"
+                        stroke-dasharray="326.7" stroke-dashoffset="326.7" stroke-linecap="round" class="transition-all duration-700" />
+              </svg>
+              <div class="absolute inset-0 flex flex-col items-center justify-center">
+                <div id="score-value" class="text-3xl font-bold tabular-nums">--</div>
+                <div class="text-xs text-slate-400">/ 100</div>
+              </div>
+            </div>
+            <div class="flex-1">
+              <p class="text-sm text-slate-300" id="score-explain">
+                Weighted across all open findings: critical&nbsp;×&nbsp;20, high&nbsp;×&nbsp;8, medium&nbsp;×&nbsp;3, low&nbsp;×&nbsp;1.
+              </p>
+              <div class="mt-3 h-24">
+                <canvas id="trend-chart"></canvas>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Counts -->
+        <div class="rounded-xl border border-slate-800 bg-slate-900 p-6">
+          <h2 class="text-sm font-medium uppercase tracking-wider text-slate-400">Open findings</h2>
+          <div class="mt-4 grid grid-cols-2 gap-3 text-sm">
+            <div class="flex items-center justify-between rounded-md bg-red-500/10 px-3 py-2">
+              <span class="font-medium text-red-300">Critical</span>
+              <span class="font-bold tabular-nums" id="kpi-critical">0</span>
+            </div>
+            <div class="flex items-center justify-between rounded-md bg-orange-500/10 px-3 py-2">
+              <span class="font-medium text-orange-300">High</span>
+              <span class="font-bold tabular-nums" id="kpi-high">0</span>
+            </div>
+            <div class="flex items-center justify-between rounded-md bg-amber-500/10 px-3 py-2">
+              <span class="font-medium text-amber-300">Medium</span>
+              <span class="font-bold tabular-nums" id="kpi-medium">0</span>
+            </div>
+            <div class="flex items-center justify-between rounded-md bg-sky-500/10 px-3 py-2">
+              <span class="font-medium text-sky-300">Low</span>
+              <span class="font-bold tabular-nums" id="kpi-low">0</span>
+            </div>
+            <div class="col-span-2 flex items-center justify-between rounded-md bg-slate-500/10 px-3 py-2">
+              <span class="font-medium text-slate-300">Info</span>
+              <span class="font-bold tabular-nums" id="kpi-info">0</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Compliance -->
+        <div class="rounded-xl border border-slate-800 bg-slate-900 p-6">
+          <h2 class="text-sm font-medium uppercase tracking-wider text-slate-400">Compliance coverage</h2>
+          <ul id="compliance-list" class="mt-4 space-y-2 text-sm"></ul>
+        </div>
+      </section>
+
+      <!-- Latest critical threats -->
+      <section class="rounded-xl border border-red-500/30 bg-slate-900 glow-critical">
+        <header class="flex items-center justify-between px-6 py-4 border-b border-slate-800">
+          <div>
+            <h2 class="text-lg font-semibold text-red-300">Latest critical threats</h2>
+            <p class="text-xs text-slate-400">Highest-CVSS open findings across all assets in the last 24 hours.</p>
+          </div>
+          <a href="#vulns" class="text-sm text-emerald-400 hover:text-emerald-300">View all →</a>
+        </header>
+        <ul id="critical-list" class="divide-y divide-slate-800"></ul>
+      </section>
+
+      <!-- Findings table -->
+      <section id="vulns" class="rounded-xl border border-slate-800 bg-slate-900">
+        <header class="flex flex-wrap items-center justify-between gap-4 px-6 py-4 border-b border-slate-800">
+          <div>
+            <h2 class="text-lg font-semibold">Vulnerabilities</h2>
+            <p class="text-xs text-slate-400">Filter by severity, status, asset, or type.</p>
+          </div>
+          <div class="flex flex-wrap items-center gap-2 text-sm">
+            <input id="search" type="search" placeholder="Search…"
+                   class="rounded-md border-slate-700 bg-slate-800 text-slate-100 placeholder-slate-500 focus:border-emerald-400 focus:ring-emerald-400" />
+            <select id="filter-severity" class="rounded-md border-slate-700 bg-slate-800 text-slate-100">
+              <option value="">All severities</option>
+              <option value="critical">Critical</option>
+              <option value="high">High</option>
+              <option value="medium">Medium</option>
+              <option value="low">Low</option>
+              <option value="info">Info</option>
+            </select>
+            <select id="filter-status" class="rounded-md border-slate-700 bg-slate-800 text-slate-100">
+              <option value="">All statuses</option>
+              <option value="open">Open</option>
+              <option value="in_progress">In progress</option>
+              <option value="fixed">Fixed</option>
+              <option value="false_positive">False positive</option>
+            </select>
+          </div>
+        </header>
+        <div class="overflow-x-auto scrollbar-thin">
+          <table class="min-w-full text-sm">
+            <thead class="bg-slate-900/60 text-left text-xs uppercase tracking-wider text-slate-400">
+              <tr>
+                <th class="px-6 py-3 font-medium">Severity</th>
+                <th class="px-6 py-3 font-medium">Title</th>
+                <th class="px-6 py-3 font-medium">Asset</th>
+                <th class="px-6 py-3 font-medium">URL / Parameter</th>
+                <th class="px-6 py-3 font-medium">CVSS</th>
+                <th class="px-6 py-3 font-medium">Status</th>
+                <th class="px-6 py-3 font-medium">Discovered</th>
+              </tr>
+            </thead>
+            <tbody id="vuln-tbody" class="divide-y divide-slate-800"></tbody>
+          </table>
+        </div>
+        <footer class="px-6 py-3 text-xs text-slate-400">
+          <span id="row-count">0 findings</span>
+        </footer>
+      </section>
+    </main>
+
+    <footer class="border-t border-slate-800 py-6 text-center text-xs text-slate-500">
+      ASMS — Automated Security Management System &middot; Demo dashboard with mock data
+    </footer>
+  </div>
+
+  <script type="module" src="js/dashboard.js"></script>
+</body>
+</html>

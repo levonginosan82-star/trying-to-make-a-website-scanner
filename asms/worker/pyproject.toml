@@ -1,0 +1,45 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "asms-worker"
+version = "0.1.0"
+description = "ASMS scanner worker: pluggable Check registry with a security-headers DAST check."
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [{ name = "ASMS" }]
+license = { text = "MIT" }
+dependencies = [
+    "httpx>=0.27",
+    "pydantic>=2.6",
+    "celery>=5.3",
+    "click>=8.1",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+    "respx>=0.21",
+    "ruff>=0.4",
+    "mypy>=1.10",
+]
+
+[project.scripts]
+asms-worker = "asms_worker.cli:cli"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["asms_worker*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "W"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
